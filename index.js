@@ -6,14 +6,17 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 //middleware
-app.use(cors({
-  origin: [
-    'https://book-my-event-26b6e.web.app',
-    'https://book-my-event-26b6e.firebaseapp.com/'
-  ], 
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://book-my-event-26b6e.web.app",
+      "https://book-my-event-26b6e.firebaseapp.com/",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
@@ -46,11 +49,16 @@ async function run() {
       .db("book-my-event")
       .collection("bookings");
 
-      // event related api
+    // event related api
     app.get("/events", async (req, res) => {
       const search = req.query?.search || "";
+      const id = req.params?.id;
 
       let query = {};
+
+      if (id) {
+        query = { _id: new ObjectId(id) };
+      }
 
       if (search) {
         query = {
@@ -79,10 +87,11 @@ async function run() {
       res.send(result);
     });
 
-    // registration related api
-    app.get("/bookings", async (req, res) => {
-      const cursor = bookingsCollection.find();
-      const result = await cursor.toArray();
+    // booking registration related api
+    app.get("/bookings/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await bookingsCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -92,11 +101,61 @@ async function run() {
       res.send(result);
     });
 
+    app.put("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const { rating, comment } = req.body;
+      console.log("Rating:", rating);
+  console.log("Comment:", comment);
+  
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set:  {
+      review: {
+        rating: rating,
+        comment: comment,
+      },
+    },
+      };
+      const result = await bookingsCollection.updateOne(filter, updateDoc)
+      res.send(result)
+    });
+
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await bookingsCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // user related api
     app.get("/users", async (req, res) => {
       const email = req.query.email;
+  if (!email) {
+    return res.status(400).send({ error: "Email is required" });
+  }
       let query = { email: email };
       const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post("/users", async (req, res) => {
+      const newUser = req.body;
+      const result = await usersCollection.insertOne(newUser);
+      res.send(result);
+    });
+
+    app.put("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const { name, photoURL } = req.body;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: {
+          name: name,
+          photoURL: photoURL,
+        },
+      };
+
+      const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
   } finally {
